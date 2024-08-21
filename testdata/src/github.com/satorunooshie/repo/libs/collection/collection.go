@@ -1,0 +1,4 @@
+package collection
+
+func Do() {
+}

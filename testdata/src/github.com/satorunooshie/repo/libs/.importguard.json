@@ -1,0 +1,7 @@
+{
+ "allow": {
+  "github.com/satorunooshie/repo/libs/crypto": {
+   "github.com/satorunooshie/repo/libs/collection": {}
+  }
+ }
+}

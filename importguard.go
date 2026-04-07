@@ -2,11 +2,13 @@ package importguard
 
 import (
 	"encoding/json"
+	"errors"
 	"go/ast"
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -18,10 +20,7 @@ type config struct {
 	Deny  map[string]map[string]struct{} `json:"deny"`
 }
 
-var (
-	conf config
-	once sync.Once
-)
+const configFileName = ".importguard.json"
 
 var Analyzer = &analysis.Analyzer{
 	Name: "importguard",
@@ -32,24 +31,98 @@ var Analyzer = &analysis.Analyzer{
 	},
 }
 
-func parseConfig() error {
-	fp := os.Getenv("IMPORTGUARD_CONFIG")
-	if fp == "" {
-		return nil
+func parseConfig(pass *analysis.Pass) (config, error) {
+	fp, err := resolveConfigPath(pass)
+	if err != nil {
+		return config{}, err
 	}
+	if fp == "" {
+		return config{}, nil
+	}
+	return loadConfig(fp)
+}
+
+func loadConfig(fp string) (config, error) {
 	b, err := os.ReadFile(fp)
 	if err != nil {
-		return err
+		return config{}, err
 	}
-	return json.Unmarshal(b, &conf)
+	var conf config
+	err = json.Unmarshal(b, &conf)
+	if err != nil {
+		return config{}, err
+	}
+	return conf, nil
+}
+
+func resolveConfigPath(pass *analysis.Pass) (string, error) {
+	var filenames []string
+	for _, f := range pass.Files {
+		filename := pass.Fset.PositionFor(f.Pos(), false).Filename
+		if filename == "" {
+			continue
+		}
+		filenames = append(filenames, filename)
+	}
+	return findConfigFile(filenames...)
+}
+
+func findConfigFile(filenames ...string) (string, error) {
+	type candidate struct {
+		path  string
+		depth int
+	}
+
+	var candidates []candidate
+	seen := map[string]struct{}{}
+
+	for _, filename := range filenames {
+		if filename == "" {
+			continue
+		}
+
+		dir, err := filepath.Abs(filepath.Dir(filename))
+		if err != nil {
+			return "", err
+		}
+
+		for depth := 0; ; depth++ {
+			fp := filepath.Join(dir, configFileName)
+			if _, err := os.Stat(fp); err == nil {
+				if _, exists := seen[fp]; !exists {
+					seen[fp] = struct{}{}
+					candidates = append(candidates, candidate{path: fp, depth: depth})
+				}
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return "", err
+			}
+
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+
+	if len(candidates) == 0 {
+		return "", nil
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].depth != candidates[j].depth {
+			return candidates[i].depth < candidates[j].depth
+		}
+		return candidates[i].path < candidates[j].path
+	})
+	return candidates[0].path, nil
 }
 
 func run(pass *analysis.Pass) (any, error) {
-	once.Do(func() {
-		if err := parseConfig(); err != nil {
-			panic(err)
-		}
-	})
+	conf, err := parseConfig(pass)
+	if err != nil {
+		return nil, err
+	}
 
 	allowlist, aTarget := conf.Allow[pass.Pkg.Path()]
 	denylist, dTarget := conf.Deny[pass.Pkg.Path()]

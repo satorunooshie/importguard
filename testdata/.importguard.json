@@ -6,9 +6,9 @@
   "github.com/satorunooshie/repo/libs/crypto": {}
  },
  "deny": {
-   "github.com/satorunooshie/repo/internal": {
-     "fmt": {},
-     "github.com/satorunooshie/repo/libs/collection": {}
-   }
+  "github.com/satorunooshie/repo/internal": {
+   "fmt": {},
+   "github.com/satorunooshie/repo/libs/collection": {}
+  }
  }
 }

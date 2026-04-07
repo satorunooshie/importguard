@@ -13,6 +13,7 @@ func TestWithAutoDiscoveredConfig(t *testing.T) {
 		"github.com/satorunooshie/example/cases/blacklist",
 		"github.com/satorunooshie/example/cases/domainregex",
 		"github.com/satorunooshie/example/cases/exactdeny",
+		"github.com/satorunooshie/example/cases/exactdeny/child",
 		"github.com/satorunooshie/example/cases/localoverride",
 		"github.com/satorunooshie/example/cases/regexdeny",
 		"github.com/satorunooshie/example/cases/mixedallow",

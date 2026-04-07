@@ -10,7 +10,7 @@ This module targets Go 1.26 or later.
 Projects analyzed by importguard may target older Go versions.
 
 ```bash
-go install github.com/satorunooshie/importguard/v3/cmd/importguard@latest
+go install github.com/satorunooshie/importguard/v4/cmd/importguard@latest
 ```
 
 ## Quick Start
@@ -99,12 +99,14 @@ If no `.importguard.json` is found, importguard does not report any imports.
 
 ### Rule Evaluation
 
-Import rules are defined per package path. The keys under `allow` and `deny` are the package being checked, and the nested keys are the import paths matched against each import in that package.
+Import rules are defined per package path prefix. The keys under `allow` and `deny` select the package being checked, and the nested keys are the import paths matched against each import in that package.
 
 - `deny` takes precedence over `allow`
 - standard library packages are allowed by default
 - packages with `allow` rules use whitelist behavior for non-standard imports
 - packages with only `deny` rules use blacklist behavior
+- package rules apply to the exact package and its subpackages
+- when multiple package rules match, the longest package path wins
 
 ### Nearest Config Example
 `example/.importguard.json`

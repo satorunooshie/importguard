@@ -185,8 +185,8 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	allowlist, aTarget := conf.Allow[pass.Pkg.Path()]
-	denylist, dTarget := conf.Deny[pass.Pkg.Path()]
+	allowlist, aTarget := lookupMatcherSet(conf.Allow, pass.Pkg.Path())
+	denylist, dTarget := lookupMatcherSet(conf.Deny, pass.Pkg.Path())
 	if !aTarget && !dTarget {
 		return nil, nil
 	}
@@ -214,6 +214,30 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	})
 	return nil, nil
+}
+
+func lookupMatcherSet(rules map[string]matcherSet, pkgPath string) (matcherSet, bool) {
+	var (
+		best    matcherSet
+		bestLen = -1
+		found   bool
+	)
+	for rulePkg, ms := range rules {
+		if !packageRuleMatches(rulePkg, pkgPath) {
+			continue
+		}
+		if len(rulePkg) <= bestLen {
+			continue
+		}
+		best = ms
+		bestLen = len(rulePkg)
+		found = true
+	}
+	return best, found
+}
+
+func packageRuleMatches(rulePkg, pkgPath string) bool {
+	return pkgPath == rulePkg || strings.HasPrefix(pkgPath, rulePkg+"/")
 }
 
 func matchesList(path string, patterns matcherSet) bool {

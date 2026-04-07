@@ -1,4 +1,4 @@
-module github.com/satorunooshie/importguard/v2
+module github.com/satorunooshie/importguard/v3
 
 go 1.26.0
 

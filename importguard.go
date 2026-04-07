@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,7 +21,19 @@ type config struct {
 	Deny  map[string]map[string]struct{} `json:"deny"`
 }
 
+type compiledConfig struct {
+	Allow map[string]matcherSet
+	Deny  map[string]matcherSet
+}
+
+type matcherSet struct {
+	Exact       map[string]struct{}
+	HasWildcard bool
+	Regex       []*regexp.Regexp
+}
+
 const configFileName = ".importguard.json"
+const regexPrefix = "re^"
 
 var Analyzer = &analysis.Analyzer{
 	Name: "importguard",
@@ -31,28 +44,76 @@ var Analyzer = &analysis.Analyzer{
 	},
 }
 
-func parseConfig(pass *analysis.Pass) (config, error) {
+func parseConfig(pass *analysis.Pass) (compiledConfig, error) {
 	fp, err := resolveConfigPath(pass)
 	if err != nil {
-		return config{}, err
+		return compiledConfig{}, err
 	}
 	if fp == "" {
-		return config{}, nil
+		return compiledConfig{}, nil
 	}
 	return loadConfig(fp)
 }
 
-func loadConfig(fp string) (config, error) {
+func loadConfig(fp string) (compiledConfig, error) {
 	b, err := os.ReadFile(fp)
 	if err != nil {
-		return config{}, err
+		return compiledConfig{}, err
 	}
-	var conf config
-	err = json.Unmarshal(b, &conf)
+	var raw config
+	err = json.Unmarshal(b, &raw)
 	if err != nil {
-		return config{}, err
+		return compiledConfig{}, err
 	}
-	return conf, nil
+	return compileConfig(raw)
+}
+
+func compileConfig(raw config) (compiledConfig, error) {
+	allow, err := compileMatcherMap(raw.Allow)
+	if err != nil {
+		return compiledConfig{}, err
+	}
+	deny, err := compileMatcherMap(raw.Deny)
+	if err != nil {
+		return compiledConfig{}, err
+	}
+	return compiledConfig{
+		Allow: allow,
+		Deny:  deny,
+	}, nil
+}
+
+func compileMatcherMap(raw map[string]map[string]struct{}) (map[string]matcherSet, error) {
+	compiled := make(map[string]matcherSet, len(raw))
+	for pkgPath, patterns := range raw {
+		ms, err := compileMatcherSet(patterns)
+		if err != nil {
+			return nil, err
+		}
+		compiled[pkgPath] = ms
+	}
+	return compiled, nil
+}
+
+func compileMatcherSet(patterns map[string]struct{}) (matcherSet, error) {
+	ms := matcherSet{
+		Exact: make(map[string]struct{}, len(patterns)),
+	}
+	for pattern := range patterns {
+		switch {
+		case pattern == "*":
+			ms.HasWildcard = true
+		case strings.HasPrefix(pattern, regexPrefix):
+			re, err := regexp.Compile("^" + strings.TrimPrefix(pattern, regexPrefix))
+			if err != nil {
+				return matcherSet{}, err
+			}
+			ms.Regex = append(ms.Regex, re)
+		default:
+			ms.Exact[pattern] = struct{}{}
+		}
+	}
+	return ms, nil
 }
 
 func resolveConfigPath(pass *analysis.Pass) (string, error) {
@@ -138,14 +199,36 @@ func run(pass *analysis.Pass) (any, error) {
 	inspect.Preorder(nodeFilter, func(n ast.Node) {
 		s := n.(*ast.ImportSpec)
 		path, _ := strconv.Unquote(s.Path.Value)
-		if _, exists := allowlist[path]; exists {
+		if matchesList(path, denylist) {
+			pass.Reportf(s.Pos(), "prohibited import package: %s", s.Path.Value)
 			return
 		}
-		if _, exists := denylist[path]; exists || !isStandardImportPath(path) {
+		if !aTarget {
+			return
+		}
+		if matchesList(path, allowlist) {
+			return
+		}
+		if !isStandardImportPath(path) {
 			pass.Reportf(s.Pos(), "prohibited import package: %s", s.Path.Value)
 		}
 	})
 	return nil, nil
+}
+
+func matchesList(path string, patterns matcherSet) bool {
+	if patterns.HasWildcard {
+		return true
+	}
+	if _, exists := patterns.Exact[path]; exists {
+		return true
+	}
+	for _, re := range patterns.Regex {
+		if re.MatchString(path) {
+			return true
+		}
+	}
+	return false
 }
 
 // copied from https://pkg.go.dev/cmd/go/internal/search#IsStandardImportPath

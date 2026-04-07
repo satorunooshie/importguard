@@ -9,9 +9,12 @@ import (
 func TestWithAutoDiscoveredConfig(t *testing.T) {
 	testdata := analysistest.TestData()
 	analysistest.Run(t, testdata, Analyzer,
-		"github.com/satorunooshie/repo/client",
-		"github.com/satorunooshie/repo/internal",
-		"github.com/satorunooshie/repo/libs/collection",
-		"github.com/satorunooshie/repo/libs/crypto",
+		"github.com/satorunooshie/example/cases/allimports",
+		"github.com/satorunooshie/example/cases/blacklist",
+		"github.com/satorunooshie/example/cases/domainregex",
+		"github.com/satorunooshie/example/cases/exactdeny",
+		"github.com/satorunooshie/example/cases/localoverride",
+		"github.com/satorunooshie/example/cases/regexdeny",
+		"github.com/satorunooshie/example/cases/mixedallow",
 	)
 }

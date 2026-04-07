@@ -1,0 +1,7 @@
+{
+ "allow": {
+  "github.com/satorunooshie/example/cases/localoverride": {
+   "github.com/satorunooshie/example/targets/exact": {}
+  }
+ }
+}

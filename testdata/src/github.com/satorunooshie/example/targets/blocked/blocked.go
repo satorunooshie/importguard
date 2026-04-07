@@ -1,0 +1,3 @@
+package blocked
+
+func Do() {}

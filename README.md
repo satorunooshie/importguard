@@ -10,14 +10,65 @@ This module targets Go 1.26 or later.
 Projects analyzed by importguard may target older Go versions.
 
 ```bash
-go install github.com/satorunooshie/importguard/v2/cmd/importguard@latest
+go install github.com/satorunooshie/importguard/v3/cmd/importguard@latest
 ```
 
-## Configuration
-A configuration file in JSON format is required, which specifies the allowed and/or denied import paths.
+## Quick Start
+A configuration file in JSON format is required.
 
-ImportGuard loads `.importguard.json` by searching upward from the analyzed Go files.
+- `deny` only: blacklist mode
+- `allow` present: whitelist mode for non-standard imports
+- `deny` always wins over `allow`
 
+- Block a few imports and allow everything else: use `deny` only
+- Allow only a few non-standard imports: add `allow`
+- Allow everything except a few paths: use `allow: {"*": {}}` together with `deny`
+
+Prefer exact matches when they are sufficient. Use `*` for "allow everything", and use `re^...` only when you need pattern matching. Prefer `*` over `re^.*$`.
+
+- Blacklist example:
+
+```json
+{
+ "deny": {
+  "your/module/restricted": {
+   "fmt": {},
+   "github.com/satorunooshie/hoge": {}
+  }
+ }
+}
+```
+
+- Whitelist example:
+
+```json
+{
+ "allow": {
+  "your/module/app": {
+   "your/module/alloweddep": {}
+  }
+ }
+}
+```
+
+- Allow everything, then deny one subtree:
+
+```json
+{
+ "allow": {
+  "your/module/usecase": {
+   "*": {}
+  }
+ },
+ "deny": {
+  "your/module/usecase": {
+   "re^your/module/forbidden(/.*)?$": {}
+  }
+ }
+}
+```
+
+## Config Discovery
 Place `.importguard.json` in your repository root, or in a subdirectory if you want rules that apply only to that subtree.
 
 For example, if your repository looks like this:
@@ -36,54 +87,48 @@ If multiple `.importguard.json` files are visible from the analyzed files, impor
 
 If no `.importguard.json` is found, importguard does not report any imports.
 
-## Configuration Details
-- Allow: Specifies non-standard import paths that are explicitly allowed for specific packages.
-  - Note: Standard library packages do not need to be listed here; they are allowed by default. Only non-standard (external) packages that you explicitly want to allow should be listed.
-- Deny: Specifies import paths that are denied for specific packages.
-  - Note: This section can include both standard library packages and non-standard packages. Use this to list exceptions that should be denied, even if they are generally acceptable.
+## Rule Reference
+- `allow`
+  Non-standard imports allowed for a package. If `allow` exists for a package, that package uses whitelist behavior for non-standard imports.
+- `deny`
+  Imports prohibited for a package. If a package has only `deny`, it behaves like a blacklist.
+- `*`
+  Matches any import path.
+- `re^...`
+  Treated as a regular expression. Use only when exact matches are not enough.
 
-### Example
-`repo/.importguard.json`
+### Rule Evaluation
 
-```json
-{
- "allow": {
-  "github.com/satorunooshie/repo/client": {
-   "github.com/satorunooshie/repo/libs/collection": {}
-  },
-  "github.com/satorunooshie/repo/libs/crypto": {}
- },
- "deny": {
-   "github.com/satorunooshie/repo/internal": {
-     "fmt": {},
-     "github.com/satorunooshie/repo/libs/collection": {}
-   }
- }
-}
-```
+Import rules are defined per package path. The keys under `allow` and `deny` are the package being checked, and the nested keys are the import paths matched against each import in that package.
 
-`repo/libs/.importguard.json`
+- `deny` takes precedence over `allow`
+- standard library packages are allowed by default
+- packages with `allow` rules use whitelist behavior for non-standard imports
+- packages with only `deny` rules use blacklist behavior
+
+### Nearest Config Example
+`example/.importguard.json`
 
 ```json
 {
  "allow": {
-  "github.com/satorunooshie/repo/libs/crypto": {
-   "github.com/satorunooshie/repo/libs/collection": {}
+  "github.com/satorunooshie/example/cases/localoverride": {
+   "re^github\\.com/satorunooshie/example/targets/family(/.*)?$": {}
   }
  }
 }
 ```
 
-In this example, the following rules are applied:
-- `github.com/satorunooshie/repo/client` can import `github.com/satorunooshie/repo/libs/collection` and standard library packages.
-- `github.com/satorunooshie/repo/internal` cannot import `fmt` or `github.com/satorunooshie/repo/libs/collection`.
-- `github.com/satorunooshie/repo/libs/crypto` matches both config files, so the nearer `repo/libs/.importguard.json` is used and `github.com/satorunooshie/repo/libs/collection` is allowed there.
+`example/cases/localoverride/.importguard.json`
 
-## Example Output
-If an import rule is violated, ImportGuard will output a message similar to the following:
-
-```bash
-~/importguard/testdata/src/github.com/satorunooshie/repo/internal/internal.go:4:2: prohibited import package: "fmt"
+```json
+{
+ "allow": {
+  "github.com/satorunooshie/example/cases/localoverride": {
+   "github.com/satorunooshie/example/targets/exact": {}
+  }
+ }
+}
 ```
 
-This indicates that the fmt package was imported in github.com/satorunooshie/repo/internal, which violates the rules defined in the configuration file.
+When analyzing `github.com/satorunooshie/example/cases/localoverride`, the nearer config in `cases/localoverride/.importguard.json` is used instead of the root config.

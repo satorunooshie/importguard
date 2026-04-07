@@ -1,4 +1,0 @@
-package collection
-
-func Do() {
-}

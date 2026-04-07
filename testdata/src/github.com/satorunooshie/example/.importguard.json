@@ -1,0 +1,41 @@
+{
+ "allow": {
+  "github.com/satorunooshie/example/cases/allimports": {
+   "*": {}
+  },
+  "github.com/satorunooshie/example/cases/localoverride": {
+   "re^github\\.com/satorunooshie/example/targets/family(/.*)?$": {}
+  },
+  "github.com/satorunooshie/example/cases/domainregex": {
+   "re^github\\.com/satorunooshie/example/targets/family(/.*)?$": {}
+  },
+  "github.com/satorunooshie/example/cases/exactdeny": {
+   "*": {}
+  },
+  "github.com/satorunooshie/example/cases/regexdeny": {
+   "github.com/satorunooshie/example/targets/blocked": {}
+  },
+  "github.com/satorunooshie/example/cases/mixedallow": {
+   "github.com/satorunooshie/example/targets/exact": {},
+   "re^github\\.com/satorunooshie/example/targets/family(/.*)?$": {}
+  }
+ },
+ "deny": {
+  "github.com/satorunooshie/example/cases/allimports": {
+   "re^github\\.com/satorunooshie/example/targets/blocked(/.*)?$": {}
+  },
+  "github.com/satorunooshie/example/cases/blacklist": {
+   "fmt": {},
+   "re^github\\.com/satorunooshie/example/targets/blocked(/.*)?$": {}
+  },
+  "github.com/satorunooshie/example/cases/domainregex": {
+   "re^github\\.com/satorunooshie/example/targets/blocked(/.*)?$": {}
+  },
+  "github.com/satorunooshie/example/cases/exactdeny": {
+   "github.com/satorunooshie/example/targets/blocked": {}
+  },
+  "github.com/satorunooshie/example/cases/regexdeny": {
+   "re^github\\.com/satorunooshie/example/targets/blocked(/.*)?$": {}
+  }
+ }
+}
